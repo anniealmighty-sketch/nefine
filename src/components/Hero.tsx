@@ -6,6 +6,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowDown, MessageSquare, Briefcase } from 'lucide-react';
+import heroImage from '../assets/images/regenerated_image_1780860183461.png';
 
 interface HeroProps {
   onNavigate: (section: string) => void;
@@ -98,6 +99,101 @@ export default function Hero({ onNavigate }: HeroProps) {
               간편 문의하기
             </button>
           </motion.div>
+
+          {/* Dynamic Infinite Partner Rolling Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="mt-12 pt-6 border-t border-dashed border-gray-200 overflow-hidden w-full"
+          >
+            <div className="flex items-center justify-between gap-2 mb-3.5 px-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-malachite" />
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400 font-mono">
+                  TRUSTED BY INSPIRING CLIENTS & PARTNERS
+                </p>
+              </div>
+              <span className="text-[9px] font-mono font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">
+                14 BRANDS
+              </span>
+            </div>
+
+            {/* Rolling Banner track */}
+            <div className="relative w-full overflow-hidden select-none">
+              {/* Left / Right edge fog gradients */}
+              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
+              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
+
+              <div className="flex whitespace-nowrap overflow-hidden py-1">
+                {/* We run dual structures so it seamlessly infinite loops */}
+                <div className="animate-marquee flex gap-3 pr-3">
+                  {[
+                    { name: 'LT정밀', desc: '정밀 제조' },
+                    { name: 'Hair of Day', desc: '뷰티' },
+                    { name: '수산고분자', desc: '친환경' },
+                    { name: '고기굽는밤', desc: 'F&B' },
+                    { name: '모비젠', desc: '빅데이터' },
+                    { name: 'Tmony', desc: '핀테크' },
+                    { name: '보리원', desc: '헬스푸드' },
+                    { name: '전주문화재단', desc: '문화예술' },
+                    { name: '산책메이트', desc: '라이프' },
+                    { name: '보령달 펜션', desc: '휴양' },
+                    { name: '수화담', desc: '메디카페' },
+                    { name: '빛나는 사진관', desc: '스튜디오' },
+                    { name: '최가네 사과농원', desc: '농생명' },
+                    { name: '착칵스튜디오', desc: '콘텐츠' }
+                  ].map((partner, idx) => (
+                    <div
+                      key={`p1-${idx}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-100 shadow-2xs hover:border-malachite/30 hover:shadow-xs transition-all duration-300 group cursor-pointer"
+                    >
+                      <div className="w-1 h-1 rounded-full bg-gray-200 group-hover:bg-malachite transition-colors" />
+                      <span className="text-xs font-bold text-gray-800 group-hover:text-gray-950 transition-colors">
+                        {partner.name}
+                      </span>
+                      <span className="text-[9px] text-gray-400 group-hover:text-malachite group-hover:bg-malachite-light font-medium px-1 py-0.5 rounded-md bg-gray-50 transition-colors">
+                        {partner.desc}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Repeated structure */}
+                <div className="animate-marquee flex gap-3 pr-3" aria-hidden="true">
+                  {[
+                    { name: 'LT정밀', desc: '정밀 제조' },
+                    { name: 'Hair of Day', desc: '뷰티' },
+                    { name: '수산고분자', desc: '친환경' },
+                    { name: '고기굽는밤', desc: 'F&B' },
+                    { name: '모비젠', desc: '빅데이터' },
+                    { name: 'Tmony', desc: '핀테크' },
+                    { name: '보리원', desc: '헬스푸드' },
+                    { name: '전주문화재단', desc: '문화예술' },
+                    { name: '산책메이트', desc: '라이프' },
+                    { name: '보령달 펜션', desc: '휴양' },
+                    { name: '수화담', desc: '메디카페' },
+                    { name: '빛나는 사진관', desc: '스튜디오' },
+                    { name: '최가네 사과농원', desc: '농생명' },
+                    { name: '착칵스튜디오', desc: '콘텐츠' }
+                  ].map((partner, idx) => (
+                    <div
+                      key={`p2-${idx}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-100 shadow-2xs hover:border-malachite/30 hover:shadow-xs transition-all duration-300 group cursor-pointer"
+                    >
+                      <div className="w-1 h-1 rounded-full bg-gray-200 group-hover:bg-malachite transition-colors" />
+                      <span className="text-xs font-bold text-gray-800 group-hover:text-gray-950 transition-colors">
+                        {partner.name}
+                      </span>
+                      <span className="text-[9px] text-gray-400 group-hover:text-malachite group-hover:bg-malachite-light font-medium px-1 py-0.5 rounded-md bg-gray-50 transition-colors">
+                        {partner.desc}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
 
         {/* Big Interactive Visual representation / Right Column */}
@@ -113,7 +209,7 @@ export default function Hero({ onNavigate }: HeroProps) {
             {/* The high-quality designer workspace theme image */}
             <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-inner">
               <img
-                src="/src/assets/images/regenerated_image_1780860183461.png"
+                src={heroImage}
                 alt="Professional Brand Design Studio"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
@@ -162,7 +258,7 @@ export default function Hero({ onNavigate }: HeroProps) {
       </div>
 
       {/* Bounce scroll down button */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 hidden sm:block">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 hidden sm:block">
         <button
           onClick={() => onNavigate('works')}
           className="text-gray-400 hover:text-malachite transition-colors flex flex-col items-center gap-1.5 cursor-pointer"

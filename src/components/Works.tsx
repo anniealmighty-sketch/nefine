@@ -72,6 +72,43 @@ export default function Works() {
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingProject, setEditingProject] = useState<PortfolioItem | null>(null);
+  const [uploadingField, setUploadingField] = useState<'cover' | 'inner' | null>(null);
+
+  const uploadImageToServer = async (file: File, type: 'cover' | 'inner') => {
+    if (!editingProject) return;
+    setUploadingField(type);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        if (typeof reader.result === 'string') {
+          const response = await fetch('/api/upload-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              base64Data: reader.result,
+              fileName: file.name
+            })
+          });
+          const result = await response.json();
+          if (result.success && result.imageUrl) {
+            if (type === 'cover') {
+              setEditingProject(prev => prev ? { ...prev, imageUrl: result.imageUrl } : null);
+            } else {
+              setEditingProject(prev => prev ? { ...prev, innerImageUrl: result.imageUrl } : null);
+            }
+          } else {
+            alert('이미지 업로드에 실패했습니다: ' + (result.error || 'Unknown error'));
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Upload handler error:', err);
+      alert('업로드 중 오류 발생: ' + err.message);
+    } finally {
+      setUploadingField(null);
+    }
+  };
 
   const categories: ProjectCategory[] = ['All', 'Brochure', 'WallGraphic', 'Logo', 'DetailPage'];
 
@@ -87,7 +124,7 @@ export default function Works() {
     ? projects
     : projects.filter(item => item.category === selectedCategory);
 
-  const handleUpdateProject = (updated: PortfolioItem) => {
+  const handleUpdateProject = async (updated: PortfolioItem) => {
     const updatedList = projects.map(p => p.id === updated.id ? updated : p);
     setProjects(updatedList);
     
@@ -100,6 +137,19 @@ export default function Works() {
 
       // 2. Fallback full set saving for legacy compatibility
       localStorage.setItem('nefine_portfolio_items', JSON.stringify(updatedList));
+
+      // 3. Persist permanently back to server: rewrites /src/data.ts safely
+      const response = await fetch('/api/portfolio/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ projects: updatedList })
+      });
+      const result = await response.json();
+      if (!result.success) {
+        console.error('Failed to save to files:', result.error);
+      }
     } catch (e) {
       console.error('Error saving project update:', e);
     }
@@ -110,13 +160,30 @@ export default function Works() {
     }
   };
 
-  const handleResetToDefault = () => {
-    if (window.confirm('모든 포트폴리오 데이터를 초기 원본 상태로 안전하게 복귀하시겠습니까?')) {
-      setProjects(portfolioData);
-      localStorage.removeItem('nefine_portfolio_items');
-      localStorage.removeItem('nefine_portfolio_edits');
-      setEditingProject(null);
-      setSelectedProject(null);
+  const handleResetToDefault = async () => {
+    if (window.confirm('모든 포트폴리오 데이터를 초기 원본 상태로 안전하게 복귀하시겠습니까? (서버 원본 복구 포함)')) {
+      try {
+        const response = await fetch('/api/portfolio/reset', {
+          method: 'POST'
+        });
+        const result = await response.json();
+        if (result.success) {
+          // reload page to pickup default values natively from new imports
+          localStorage.removeItem('nefine_portfolio_items');
+          localStorage.removeItem('nefine_portfolio_edits');
+          window.location.reload();
+        } else {
+          alert('데이터 복구 실패: ' + result.error);
+        }
+      } catch (err: any) {
+        console.error('Reset target error:', err);
+        // Local only fallback
+        setProjects(portfolioData);
+        localStorage.removeItem('nefine_portfolio_items');
+        localStorage.removeItem('nefine_portfolio_edits');
+        setEditingProject(null);
+        setSelectedProject(null);
+      }
     }
   };
 
@@ -440,23 +507,27 @@ export default function Works() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Direct Upload Area */}
                       <label className="border-2 border-dashed border-gray-200 hover:border-amber-400 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-white group/upload-cover h-[130px]">
-                        <Upload className="w-6 h-6 text-gray-400 group-hover/upload-cover:text-amber-500 mb-1.5 transition-colors" />
-                        <span className="text-xs font-bold text-gray-700">기기에서 이미지 직접 선택</span>
-                        <span className="text-[10px] text-gray-400 mt-0.5">PNG, JPG, WEBP</span>
+                        {uploadingField === 'cover' ? (
+                          <div className="flex flex-col items-center justify-center">
+                            <RefreshCw className="w-6 h-6 text-amber-500 animate-spin mb-1.5" />
+                            <span className="text-xs font-bold text-gray-750">서버로 업로드 중...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <Upload className="w-6 h-6 text-gray-400 group-hover/upload-cover:text-amber-500 mb-1.5 transition-colors" />
+                            <span className="text-xs font-bold text-gray-700">기기에서 이미지 직접 선택</span>
+                            <span className="text-[10px] text-gray-400 mt-0.5">PNG, JPG, WEBP</span>
+                          </>
+                        )}
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
+                          disabled={uploadingField !== null}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                if (typeof reader.result === 'string' && editingProject) {
-                                  setEditingProject({ ...editingProject, imageUrl: reader.result });
-                                }
-                              };
-                              reader.readAsDataURL(file);
+                              uploadImageToServer(file, 'cover');
                             }
                           }}
                         />
@@ -497,23 +568,27 @@ export default function Works() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Direct Upload Area */}
                       <label className="border-2 border-dashed border-gray-200 hover:border-amber-400 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-white group/upload-inner h-[130px]">
-                        <Upload className="w-6 h-6 text-gray-400 group-hover/upload-inner:text-amber-500 mb-1.5 transition-colors" />
-                        <span className="text-xs font-bold text-gray-700">기기에서 이미지 직접 선택</span>
-                        <span className="text-[10px] text-gray-400 mt-0.5">PNG, JPG, WEBP</span>
+                        {uploadingField === 'inner' ? (
+                          <div className="flex flex-col items-center justify-center">
+                            <RefreshCw className="w-6 h-6 text-amber-500 animate-spin mb-1.5" />
+                            <span className="text-xs font-bold text-gray-750">서버로 업로드 중...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <Upload className="w-6 h-6 text-gray-400 group-hover/upload-inner:text-amber-500 mb-1.5 transition-colors" />
+                            <span className="text-xs font-bold text-gray-700">기기에서 이미지 직접 선택</span>
+                            <span className="text-[10px] text-gray-400 mt-0.5">PNG, JPG, WEBP</span>
+                          </>
+                        )}
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
+                          disabled={uploadingField !== null}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                if (typeof reader.result === 'string' && editingProject) {
-                                  setEditingProject({ ...editingProject, innerImageUrl: reader.result });
-                                }
-                              };
-                              reader.readAsDataURL(file);
+                              uploadImageToServer(file, 'inner');
                             }
                           }}
                         />
