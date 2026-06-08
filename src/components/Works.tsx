@@ -59,10 +59,18 @@ export default function Works() {
       // Merge current portfolioData from source code with user edits.
       // This is crucial: new items added to data.ts will instantly show up!
       return portfolioData.map(item => {
+        let merged = { ...item };
         if (edits[item.id]) {
-          return { ...item, ...edits[item.id] };
+          merged = { ...merged, ...edits[item.id] };
         }
-        return item;
+        // HEAL PATHS: If the browser localStorage has stale "/uploads/" dynamic files, but the code-defined portfolioData has beautiful Base64 strings, always heal them!
+        if (merged.imageUrl && merged.imageUrl.startsWith('/uploads/') && item.imageUrl && item.imageUrl.startsWith('data:')) {
+          merged.imageUrl = item.imageUrl;
+        }
+        if (merged.innerImageUrl && merged.innerImageUrl.startsWith('/uploads/') && item.innerImageUrl && item.innerImageUrl.startsWith('data:')) {
+          merged.innerImageUrl = item.innerImageUrl;
+        }
+        return merged;
       });
     } catch (e) {
       console.error('Error loading portfolio state:', e);
@@ -78,8 +86,20 @@ export default function Works() {
         const res = await fetch('/api/portfolio');
         const data = await res.json();
         if (isMounted && data && data.success && Array.isArray(data.projects)) {
-          setProjects(data.projects);
-          localStorage.setItem('nefine_portfolio_items', JSON.stringify(data.projects));
+          // Robustly clean stale dynamic uploads from backend response as well
+          const sanitized = data.projects.map((project: any) => {
+            const original = portfolioData.find(p => p.id === project.id);
+            const updated = { ...project };
+            if (updated.imageUrl && updated.imageUrl.startsWith('/uploads/') && original && original.imageUrl && original.imageUrl.startsWith('data:')) {
+              updated.imageUrl = original.imageUrl;
+            }
+            if (updated.innerImageUrl && updated.innerImageUrl.startsWith('/uploads/') && original && original.innerImageUrl && original.innerImageUrl.startsWith('data:')) {
+              updated.innerImageUrl = original.innerImageUrl;
+            }
+            return updated;
+          });
+          setProjects(sanitized);
+          localStorage.setItem('nefine_portfolio_items', JSON.stringify(sanitized));
         }
       } catch (err) {
         console.error('Error fetching backend portfolio custom items:', err);

@@ -38,12 +38,14 @@ async function startServer() {
       defaultData = dataModuleAlt.portfolioData || [];
     } catch (err2) {
       console.error("Could not dynamically import src/data.ts, falling back to static parsed read.", err2);
-      // Fallback: simple regex parser to extract JSON content if import fails
+      // Fallback: simple parser to extract JSON array content if import fails
       try {
         const fileContent = fs.readFileSync(path.join(process.cwd(), "src", "data.ts"), "utf-8");
-        const jsonMatch = fileContent.match(/portfolioData:\s*PortfolioItem\[\]\s*=\s*([\s\S]+?);/);
-        if (jsonMatch && jsonMatch[1]) {
-          defaultData = JSON.parse(jsonMatch[1]);
+        const startIdx = fileContent.indexOf("[");
+        const endIdx = fileContent.lastIndexOf("]");
+        if (startIdx !== -1 && endIdx !== -1) {
+          const jsonStr = fileContent.substring(startIdx, endIdx + 1);
+          defaultData = JSON.parse(jsonStr);
         }
       } catch (err3) {
         console.error("Fallback file reading of src/data.ts failed too:", err3);
@@ -103,6 +105,27 @@ async function startServer() {
     }
   });
 
+  // Helper to convert any image path starting with /uploads/ in portfolio projects to Base64
+  const convertUploadPathsToBase64 = (projects: any[]) => {
+    return projects.map((project: any) => {
+      const updated = { ...project };
+      ["imageUrl", "innerImageUrl"].forEach((field) => {
+        if (updated[field] && updated[field].startsWith("/uploads/")) {
+          const fileName = updated[field].replace("/uploads/", "");
+          const filePath = path.join(uploadDir, fileName);
+          if (fs.existsSync(filePath)) {
+            const fileData = fs.readFileSync(filePath);
+            const base64 = fileData.toString("base64");
+            const ext = path.extname(fileName).toLowerCase();
+            const mime = ext === ".png" ? "image/png" : "image/jpeg";
+            updated[field] = `data:${mime};base64,${base64}`;
+          }
+        }
+      });
+      return updated;
+    });
+  };
+
   // 2. Persistent Portfolio Data Save API
   app.post("/api/portfolio/update", (req, res) => {
     try {
@@ -111,9 +134,29 @@ async function startServer() {
         return res.status(400).json({ error: "Invalid projects payload. Must be an array." });
       }
 
+      // Process uploaded images and convert them to Base64 for fully self-contained entries
+      const processedProjects = convertUploadPathsToBase64(projects);
+
       // Save to portfolioFile (uploads/portfolio.json)
-      fs.writeFileSync(portfolioFile, JSON.stringify(projects, null, 2), "utf-8");
-      res.json({ success: true });
+      fs.writeFileSync(portfolioFile, JSON.stringify(processedProjects, null, 2), "utf-8");
+
+      // Save to src/data.ts for robust, compiled persistence in exports and deployments
+      const srcDataPath = path.join(process.cwd(), "src", "data.ts");
+      const esmContent = `/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { PortfolioItem } from './types';
+
+export const portfolioData: PortfolioItem[] = ${JSON.stringify(processedProjects, null, 2)};
+`;
+      fs.writeFileSync(srcDataPath, esmContent, "utf-8");
+
+      // Ensure that defaultData is in sync for current server session too
+      defaultData = processedProjects;
+
+      res.json({ success: true, projects: processedProjects });
     } catch (err: any) {
       console.error("Save portfolio error:", err);
       res.status(500).json({ error: "Failed to save portfolio", details: err.message });
