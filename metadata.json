@@ -1,0 +1,6 @@
+{
+  "name": "Nefine",
+  "description": "비즈니스의 생산성을 높이는 토탈 디자인 파트너, Nefine의 포트폴리오 및 브랜드 디자인 소개 웹사이트입니다.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
