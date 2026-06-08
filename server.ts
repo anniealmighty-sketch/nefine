@@ -22,6 +22,50 @@ async function startServer() {
 
   // --- FULL-STACK API ENDPOINTS ---
 
+  const portfolioFile = path.join(uploadDir, "portfolio.json");
+
+  // Load the original fallback portfolio items dynamically on startup
+  let defaultData: any[] = [];
+  try {
+    const dataFilePath = path.join(process.cwd(), "src", "data.ts");
+    if (fs.existsSync(dataFilePath)) {
+      const dataModule = await import("./src/data.js");
+      defaultData = dataModule.portfolioData || [];
+    }
+  } catch (err) {
+    try {
+      const dataModuleAlt = await import("./src/data");
+      defaultData = dataModuleAlt.portfolioData || [];
+    } catch (err2) {
+      console.error("Could not dynamically import src/data.ts, falling back to static parsed read.", err2);
+      // Fallback: simple regex parser to extract JSON content if import fails
+      try {
+        const fileContent = fs.readFileSync(path.join(process.cwd(), "src", "data.ts"), "utf-8");
+        const jsonMatch = fileContent.match(/portfolioData:\s*PortfolioItem\[\]\s*=\s*([\s\S]+?);/);
+        if (jsonMatch && jsonMatch[1]) {
+          defaultData = JSON.parse(jsonMatch[1]);
+        }
+      } catch (err3) {
+        console.error("Fallback file reading of src/data.ts failed too:", err3);
+      }
+    }
+  }
+
+  // 0. Live Portfolio Query API
+  app.get("/api/portfolio", (req, res) => {
+    try {
+      if (fs.existsSync(portfolioFile)) {
+        const fileContent = fs.readFileSync(portfolioFile, "utf-8");
+        const parsed = JSON.parse(fileContent);
+        return res.json({ success: true, projects: parsed });
+      }
+      res.json({ success: true, projects: defaultData });
+    } catch (err: any) {
+      console.error("Load portfolio error:", err);
+      res.json({ success: false, error: err.message, projects: defaultData });
+    }
+  });
+
   // 1. Live Image Upload API
   app.post("/api/upload-image", (req, res) => {
     try {
@@ -67,23 +111,25 @@ async function startServer() {
         return res.status(400).json({ error: "Invalid projects payload. Must be an array." });
       }
 
-      // Rewrite src/data.ts entirely with the updated list of portfolio items!
-      const dataFilePath = path.join(process.cwd(), "src", "data.ts");
-      const fileContent = `/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import { PortfolioItem } from './types';
-
-export const portfolioData: PortfolioItem[] = ${JSON.stringify(projects, null, 2)};
-`;
-
-      fs.writeFileSync(dataFilePath, fileContent, "utf-8");
+      // Save to portfolioFile (uploads/portfolio.json)
+      fs.writeFileSync(portfolioFile, JSON.stringify(projects, null, 2), "utf-8");
       res.json({ success: true });
     } catch (err: any) {
       console.error("Save portfolio error:", err);
       res.status(500).json({ error: "Failed to save portfolio", details: err.message });
+    }
+  });
+
+  // 3. Reset Portfolio Data API
+  app.post("/api/portfolio/reset", (req, res) => {
+    try {
+      if (fs.existsSync(portfolioFile)) {
+        fs.unlinkSync(portfolioFile);
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Reset portfolio error:", err);
+      res.status(500).json({ error: "Failed to reset portfolio", details: err.message });
     }
   });
 

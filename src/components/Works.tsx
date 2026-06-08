@@ -70,6 +70,27 @@ export default function Works() {
     }
   });
 
+  // Fetch the persisted portfolio items from the non-disruptive JSON storage backend
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadBackendPortfolio() {
+      try {
+        const res = await fetch('/api/portfolio');
+        const data = await res.json();
+        if (isMounted && data && data.success && Array.isArray(data.projects)) {
+          setProjects(data.projects);
+          localStorage.setItem('nefine_portfolio_items', JSON.stringify(data.projects));
+        }
+      } catch (err) {
+        console.error('Error fetching backend portfolio custom items:', err);
+      }
+    }
+    loadBackendPortfolio();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingProject, setEditingProject] = useState<PortfolioItem | null>(null);
   const [uploadingField, setUploadingField] = useState<'cover' | 'inner' | null>(null);
